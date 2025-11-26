@@ -46,44 +46,26 @@ class Transaction(Base):
     """SQLAlchemy model for transactions"""
     __tablename__ = 'transactions'
     
-    id = Column(Integer, primary_key=True, index=True)
-    transaction_id = Column(String, unique=True, index=True)
-    user_id = Column(String, index=True)
-    user_name = Column(String)
-    amount = Column(Float)
-    amount_ratio = Column(Float)
-    merchant = Column(String)
-    merchant_category = Column(String)
-    category_risk = Column(Float)
-    location = Column(String)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    device_id = Column(String)
-    ip_address = Column(String)
-    is_anomaly_label = Column(Boolean)
-    account_age_days = Column(Integer)
-    user_avg_transaction = Column(Float)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    transaction_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String, nullable=False, index=True)
+    amount = Column(Float, nullable=False)
+    merchant = Column(String, nullable=False)
+    merchant_category = Column(String, nullable=False)
+    location = Column(String, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    is_anomaly = Column(Boolean, default=False, nullable=False)
     
     def to_dict(self):
         """Convert model to dictionary"""
         return {
-            "id": self.id,
             "transaction_id": self.transaction_id,
             "user_id": self.user_id,
-            "user_name": self.user_name,
-            "amount": self.amount,
-            "amount_ratio": self.amount_ratio,
+            "amount": float(self.amount),
             "merchant": self.merchant,
             "merchant_category": self.merchant_category,
-            "category_risk": self.category_risk,
             "location": self.location,
-            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
-            "device_id": self.device_id,
-            "ip_address": self.ip_address,
-            "is_anomaly_label": self.is_anomaly_label,
-            "account_age_days": self.account_age_days,
-            "user_avg_transaction": self.user_avg_transaction,
-            "created_at": self.created_at.isoformat() if self.created_at else None
+            "timestamp": self.timestamp.isoformat() + 'Z' if self.timestamp else None,
+            "is_anomaly": self.is_anomaly
         }
 
 
@@ -91,11 +73,12 @@ class UserProfile:
     """Represents a customer profile with transaction patterns"""
     
     def __init__(self, user_id, name, account_age_days, avg_transaction, 
-                 trust_score, preferred_categories):
+                 location, trust_score, preferred_categories):
         self.user_id = user_id
         self.name = name
         self.account_age_days = account_age_days
         self.avg_transaction = avg_transaction
+        self.location = location
         self.trust_score = trust_score
         self.preferred_categories = preferred_categories
     
@@ -105,6 +88,7 @@ class UserProfile:
             "name": self.name,
             "account_age_days": self.account_age_days,
             "avg_transaction": self.avg_transaction,
+            "location": self.location,
             "trust_score": self.trust_score,
             "preferred_categories": self.preferred_categories
         }
@@ -117,6 +101,7 @@ USER_PROFILES = {
         name="Alice Johnson",
         account_age_days=730,
         avg_transaction=150.0,
+        location="New York, NY",
         trust_score=0.95,
         preferred_categories=["grocery", "gas", "restaurant"]
     ),
@@ -125,6 +110,7 @@ USER_PROFILES = {
         name="Bob Smith",
         account_age_days=365,
         avg_transaction=300.0,
+        location="Los Angeles, CA",
         trust_score=0.75,
         preferred_categories=["electronics", "online", "travel"]
     ),
@@ -133,6 +119,7 @@ USER_PROFILES = {
         name="Charlie Williams",
         account_age_days=30,
         avg_transaction=500.0,
+        location="Miami, FL",
         trust_score=0.40,
         preferred_categories=["luxury", "jewelry", "online"]
     )
@@ -141,9 +128,14 @@ USER_PROFILES = {
 
 def get_user_profile(user_id):
     """Retrieve user profile by ID"""
-    return USER_PROFILES.get(user_id)
+    profile = USER_PROFILES.get(user_id)
+    return profile.to_dict() if profile else None
 
 
 def get_all_profiles():
-    """Get all available user profiles"""
-    return {uid: profile.to_dict() for uid, profile in USER_PROFILES.items()}
+    """Get all available user profiles as a list"""
+    return [profile.to_dict() for profile in USER_PROFILES.values()]
+
+
+# Create tables on import
+Base.metadata.create_all(engine)

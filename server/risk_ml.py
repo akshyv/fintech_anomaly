@@ -1,132 +1,157 @@
-"""
-ML-based risk scoring and SHAP explanations
-"""
 import pickle
 import numpy as np
-from sklearn.ensemble import IsolationForest
-from datetime import datetime
-import os
+import shap
+from datetime import datetime, timedelta
 
 class RiskMLService:
-    def __init__(self):
-        self.model = None
-        self.feature_names = [
-            'amount_ratio',
-            'hour',
-            'day_of_week',
-            'category_risk',
-            'account_age_days'
-        ]
-        self.load_or_train_model()
+    def __init__(self, model_path='models/model.pkl'):
+        with open(model_path, 'rb') as f:
+            self.model = pickle.load(f)
+        self.explainer = shap.TreeExplainer(self.model)
     
-    def load_or_train_model(self):
-        """Load existing model or train a new one"""
-        model_path = 'models/model.pkl'
+    def extract_features(self, transaction, user_profile):
+        """Extract features from transaction for ML model"""
+        amount_ratio = transaction['amount'] / user_profile['avg_transaction']
+        hour = datetime.fromisoformat(transaction['timestamp'].replace('Z', '+00:00')).hour
+        day = datetime.fromisoformat(transaction['timestamp'].replace('Z', '+00:00')).weekday()
         
-        if os.path.exists(model_path):
-            with open(model_path, 'rb') as f:
-                self.model = pickle.load(f)
-            print("Loaded existing Isolation Forest model")
-        else:
-            print("Training new Isolation Forest model...")
-            self.model = IsolationForest(
-                contamination=0.1,
-                random_state=42,
-                n_estimators=100
-            )
-            
-            # Generate synthetic training data
-            np.random.seed(42)
-            n_samples = 1000
-            
-            # Normal transactions
-            normal_data = np.column_stack([
-                np.random.uniform(0.5, 1.5, n_samples),
-                np.random.randint(8, 20, n_samples),
-                np.random.randint(0, 7, n_samples),
-                np.random.uniform(0.1, 0.4, n_samples),
-                np.random.uniform(100, 1000, n_samples)
-            ])
-            
-            # Anomalous transactions
-            n_anomalies = 100
-            anomaly_data = np.column_stack([
-                np.random.uniform(2.5, 5.0, n_anomalies),
-                np.random.randint(0, 24, n_anomalies),
-                np.random.randint(0, 7, n_anomalies),
-                np.random.uniform(0.6, 1.0, n_anomalies),
-                np.random.uniform(1, 30, n_anomalies)
-            ])
-            
-            training_data = np.vstack([normal_data, anomaly_data])
-            self.model.fit(training_data)
-            
-            # Save model
-            os.makedirs('models', exist_ok=True)
-            with open(model_path, 'wb') as f:
-                pickle.dump(self.model, f)
-            print(f"Model trained and saved to {model_path}")
-    
-    def extract_features(self, transaction):
-        """Extract ML features from transaction dictionary"""
-        timestamp = datetime.fromisoformat(transaction['timestamp'].replace('Z', '+00:00'))
+        # Simple merchant category encoding
+        merchant_categories = ['retail', 'restaurant', 'online', 'gas', 'grocery', 'travel', 'entertainment']
+        merchant_category_encoded = merchant_categories.index(transaction['merchant_category']) if transaction['merchant_category'] in merchant_categories else 0
         
-        features = {
-            'amount_ratio': transaction['amount_ratio'],
-            'hour': timestamp.hour,
-            'day_of_week': timestamp.weekday(),
-            'category_risk': transaction['category_risk'],
-            'account_age_days': transaction['account_age_days']
+        account_age_days = user_profile['account_age_days']
+        features = np.array([[amount_ratio, hour, day, merchant_category_encoded, account_age_days]])
+        
+        return {
+            'features': features,
+            'amount_ratio': amount_ratio,
+            'hour': hour,
+            'day': day,
+            'merchant_category_encoded': merchant_category_encoded,
+            'account_age_days': account_age_days
         }
-        
-        feature_vector = np.array([
-            features[name] for name in self.feature_names
-        ]).reshape(1, -1)
-        
-        return features, feature_vector
     
-    def calculate_shap_approximation(self, features, feature_vector, anomaly_score):
-        """Simplified SHAP-like attribution"""
-        baseline = np.array([[1.0, 14, 3, 0.3, 365]])
-        baseline_score = -self.model.score_samples(baseline)[0]
-        
-        contributions = {}
-        for i, feature_name in enumerate(self.feature_names):
-            perturbed = feature_vector.copy()
-            perturbed[0, i] = baseline[0, i]
-            perturbed_score = -self.model.score_samples(perturbed)[0]
-            contribution = anomaly_score - perturbed_score
-            contributions[feature_name] = float(contribution)
-        
-        sorted_features = sorted(
-            contributions.items(),
-            key=lambda x: abs(x[1]),
-            reverse=True
-        )[:3]
-        
-        return dict(sorted_features)
-    
-    def score_transaction(self, transaction):
-        """Score a transaction and return anomaly score with SHAP features"""
+    def score_transaction(self, transaction, user_profile):
+        """Score transaction with ML model and return SHAP explanations"""
         try:
-            features, feature_vector = self.extract_features(transaction)
-            raw_score = -self.model.score_samples(feature_vector)[0]
-            anomaly_score = min(max(raw_score, 0), 1)
+            print("AKSHY_transaction:", transaction)
+            feature_data = self.extract_features(transaction, user_profile)
+            print("="*15)
+            print(f"Extracted features shape: {feature_data['features'].shape}")
+            features = feature_data['features']
+            print(f"Features array: {features}")
             
-            shap_features = self.calculate_shap_approximation(
-                features, 
-                feature_vector, 
-                raw_score
-            )
+            # Get anomaly score (Isolation Forest returns -1 to 1, convert to 0 to 1)
+            anomaly_score_raw = self.model.decision_function(features)[0]
+            print(f"Raw anomaly score: {anomaly_score_raw}")
+            # Normalize to 0-1 range (higher = more anomalous)
+            anomaly_score = 1 / (1 + np.exp(anomaly_score_raw))
+            print(f"Normalized anomaly score: {anomaly_score}")
+            
+            # Calculate SHAP values
+            shap_values = self.explainer.shap_values(features)
+            feature_names = ['amount_ratio', 'hour', 'day', 'merchant_category']
+            
+            # Get top 3 features by absolute SHAP value
+            shap_dict = {name: float(value) for name, value in zip(feature_names, shap_values[0])}
+            sorted_shap = sorted(shap_dict.items(), key=lambda x: abs(x[1]), reverse=True)[:3]
             
             return {
                 'anomaly_score': float(anomaly_score),
-                'shap_features': shap_features,
-                'raw_features': features
+                'shap_features': dict(sorted_shap),
+                'raw_features': {
+                    'amount_ratio': float(feature_data['amount_ratio']),
+                    'hour': int(feature_data['hour']),
+                    'day': int(feature_data['day']),
+                    'merchant_category_encoded': int(feature_data['merchant_category_encoded'])
+                }
             }
-            
         except Exception as e:
             raise Exception(f"Error scoring transaction: {str(e)}")
-
-
-risk_ml_service = RiskMLService()
+    
+    def calculate_risk_score(self, transaction, user_profile, ml_score, recent_transactions):
+        """
+        Calculate multi-factor risk score combining ML + business rules
+        
+        Components:
+        - model_anomaly (0.4): ML model's assessment
+        - amount_ratio (0.3): Transaction size vs user's average
+        - user_trust (0.2): Account age (newer accounts = higher risk)
+        - velocity (0.1): Recent transaction count
+        """
+        try:
+            # Component 1: Model Anomaly (weight 0.4)
+            model_anomaly_value = ml_score
+            model_anomaly_weight = 0.4
+            model_anomaly_contribution = model_anomaly_value * model_anomaly_weight
+            
+            # Component 2: Amount Ratio (weight 0.3)
+            # High ratio = high risk, cap at 3x for scoring
+            amount_ratio = transaction['amount'] / user_profile['avg_transaction']
+            amount_ratio_normalized = min(amount_ratio / 3.0, 1.0)  # Normalize to 0-1
+            amount_ratio_weight = 0.3
+            amount_ratio_contribution = amount_ratio_normalized * amount_ratio_weight
+            
+            # Component 3: User Trust (weight 0.2)
+            # Newer accounts = less trust = higher risk
+            # 0 days = 1.0 risk, 365+ days = 0.0 risk
+            account_age_days = user_profile['account_age_days']
+            user_trust_value = max(0, 1.0 - (account_age_days / 365.0))
+            user_trust_weight = 0.2
+            user_trust_contribution = user_trust_value * user_trust_weight
+            
+            # Component 4: Velocity (weight 0.1)
+            # More transactions in last hour = higher risk
+            # 0 txns = 0.0 risk, 5+ txns = 1.0 risk
+            velocity_count = len(recent_transactions)
+            velocity_value = min(velocity_count / 5.0, 1.0)
+            velocity_weight = 0.1
+            velocity_contribution = velocity_value * velocity_weight
+            
+            # Calculate final risk score
+            risk_score = (
+                model_anomaly_contribution +
+                amount_ratio_contribution +
+                user_trust_contribution +
+                velocity_contribution
+            )
+            
+            # Determine decision
+            if risk_score > 0.7:
+                decision = "DECLINE"
+            elif risk_score >= 0.4:
+                decision = "MANUAL REVIEW"
+            else:
+                decision = "APPROVE"
+            
+            return {
+                'risk_score': float(risk_score),
+                'decision': decision,
+                'components': {
+                    'model_anomaly': {
+                        'value': float(model_anomaly_value),
+                        'weight': model_anomaly_weight,
+                        'contribution': float(model_anomaly_contribution)
+                    },
+                    'amount_ratio': {
+                        'value': float(amount_ratio_normalized),
+                        'weight': amount_ratio_weight,
+                        'contribution': float(amount_ratio_contribution),
+                        'raw_ratio': float(amount_ratio)
+                    },
+                    'user_trust': {
+                        'value': float(user_trust_value),
+                        'weight': user_trust_weight,
+                        'contribution': float(user_trust_contribution),
+                        'account_age_days': account_age_days
+                    },
+                    'velocity': {
+                        'value': float(velocity_value),
+                        'weight': velocity_weight,
+                        'contribution': float(velocity_contribution),
+                        'recent_count': velocity_count
+                    }
+                }
+            }
+        except Exception as e:
+            raise Exception(f"Error calculating risk score: {str(e)}")

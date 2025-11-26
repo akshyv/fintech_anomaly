@@ -1,4 +1,3 @@
-<!-- client\index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,53 +8,80 @@
 </head>
 <body>
     <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <div>
-                <h1>🔍 Transaction Anomaly Detector</h1>
-                <p class="subtitle">Fintech Risk Scoring System</p>
-            </div>
-            <a href="transactions.html" style="color: #667eea; text-decoration: none; font-weight: 600;">
-                📊 View All Transactions →
-            </a>
+        <h1>Transaction Anomaly Detector</h1>
+        
+        <div class="nav-links">
+            <a href="index.html" class="active">Generator</a>
+            <a href="transactions.html">Transaction History</a>
         </div>
         
-        <!-- M0: Health Check -->
-        <div class="test-section">
-            <h2>System Health Check</h2>
-            <button id="healthBtn" class="btn-primary">Test Backend Connection</button>
-            <div id="healthResult" class="result-box"></div>
-        </div>
-
-        <!-- M1: Transaction Generator -->
         <div class="generator-section">
-            <h2>🎲 Generate Transaction</h2>
+            <div class="form-group">
+                <label for="userSelect">Select User Profile:</label>
+                <select id="userSelect">
+                    <option value="">-- Select User --</option>
+                </select>
+            </div>
             
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="userSelect">Select Customer:</label>
-                    <select id="userSelect" class="input-select">
-                        <option value="">Loading users...</option>
-                    </select>
+            <div class="form-group">
+                <label>Transaction Type:</label>
+                <div class="radio-group">
+                    <label>
+                        <input type="radio" name="transactionType" value="normal" checked>
+                        Normal
+                    </label>
+                    <label>
+                        <input type="radio" name="transactionType" value="anomaly">
+                        Anomaly
+                    </label>
                 </div>
-                
-                <div class="form-group">
-                    <label>Transaction Type:</label>
-                    <div class="radio-group">
-                        <label class="radio-label">
-                            <input type="radio" name="txnType" value="normal" checked>
-                            <span>Normal</span>
-                        </label>
-                        <label class="radio-label">
-                            <input type="radio" name="txnType" value="anomaly">
-                            <span>Anomalous</span>
-                        </label>
+            </div>
+            
+            <button id="generateBtn" class="btn-primary">Generate Transaction</button>
+        </div>
+        
+        <!-- Transaction Results -->
+        <div id="results" style="display: none;">
+            <h3>Generated Transaction</h3>
+            <pre id="transactionData"></pre>
+        </div>
+        
+        <!-- ML Scoring Results -->
+        <div id="mlResults" style="display: none;">
+            <h3>ML Anomaly Detection</h3>
+            <div class="score-display">
+                <h4>Anomaly Score: <span id="anomalyScore">0%</span></h4>
+                <p class="score-explanation">Score ranges from 0% (normal) to 100% (highly anomalous)</p>
+            </div>
+            
+            <div class="shap-section">
+                <h4>Top Contributing Features (SHAP Values)</h4>
+                <ul id="shapFeatures"></ul>
+                <p class="shap-explanation">
+                    Positive values increase anomaly score, negative values decrease it
+                </p>
+            </div>
+        </div>
+        
+        <!-- Risk Scoring Results -->
+        <div id="riskResults" style="display: none;">
+            <h3>Risk Assessment</h3>
+            
+            <div class="risk-score-display">
+                <h4>Risk Score</h4>
+                <div class="risk-bar-container">
+                    <div id="riskScoreBar" class="risk-bar">
+                        <span id="riskScore">0%</span>
                     </div>
                 </div>
             </div>
             
-            <button id="generateBtn" class="btn-primary" disabled>Generate Transaction</button>
+            <div id="decision" class="decision"></div>
             
-            <div id="transactionResult" class="result-box"></div>
+            <div>
+                <h4>Risk Component Breakdown</h4>
+                <div id="riskComponents"></div>
+            </div>
         </div>
     </div>
     
