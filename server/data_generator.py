@@ -5,7 +5,7 @@ Synthetic transaction data generation using Faker
 from faker import Faker
 import random
 from datetime import datetime
-from database import get_user_profile
+
 
 fake = Faker()
 
@@ -23,22 +23,17 @@ MERCHANT_CATEGORIES = {
 }
 
 
-def generate_transaction(user_id, is_anomaly=False):
+def generate_transaction(user_profile, is_anomaly=False):
     """
-    Generate a synthetic transaction for a given user
+    Generate a synthetic transaction for a given user profile
     
     Args:
-        user_id: User identifier (alice, bob, charlie)
+        user_profile: UserProfile object (not user_id string)
         is_anomaly: If True, generate suspicious transaction
     
     Returns:
         dict: Transaction data
     """
-    profile = get_user_profile(user_id)
-    
-    if not profile:
-        raise ValueError(f"User profile not found: {user_id}")
-    
     # Generate transaction ID
     transaction_id = f"txn_{fake.uuid4()[:8]}"
     
@@ -48,14 +43,14 @@ def generate_transaction(user_id, is_anomaly=False):
         category = random.choice(["luxury", "jewelry", "crypto", "online"])
     else:
         # For normal, use user's preferred categories
-        category = random.choice(profile.preferred_categories)
+        category = random.choice(user_profile.preferred_categories)
     
     category_info = MERCHANT_CATEGORIES[category]
     
     # Generate amount
     if is_anomaly:
         # Anomalous: 3-10x user's average
-        amount = round(profile.avg_transaction * random.uniform(3.0, 10.0), 2)
+        amount = round(user_profile.avg_transaction * random.uniform(3.0, 10.0), 2)
     else:
         # Normal: 0.5-2x user's average with some variation
         base = category_info["avg_amount"]
@@ -79,12 +74,12 @@ def generate_transaction(user_id, is_anomaly=False):
     ip_address = fake.ipv4()
     
     # Calculate amount ratio (transaction amount / user average)
-    amount_ratio = round(amount / profile.avg_transaction, 2)
+    amount_ratio = round(amount / user_profile.avg_transaction, 2)
     
     transaction = {
         "transaction_id": transaction_id,
-        "user_id": user_id,
-        "user_name": profile.name,
+        "user_id": user_profile.user_id,
+        "user_name": user_profile.name,
         "amount": amount,
         "amount_ratio": amount_ratio,
         "merchant": merchant,
@@ -94,20 +89,20 @@ def generate_transaction(user_id, is_anomaly=False):
         "timestamp": timestamp,
         "device_id": device_id,
         "ip_address": ip_address,
-        "is_anomaly_label": is_anomaly,  # Ground truth for demo
-        "account_age_days": profile.account_age_days,
-        "user_avg_transaction": profile.avg_transaction
+        "is_anomaly_label": is_anomaly,
+        "account_age_days": user_profile.account_age_days,
+        "user_avg_transaction": user_profile.avg_transaction
     }
     
     return transaction
 
 
-def generate_batch_transactions(user_id, count=10, anomaly_ratio=0.2):
+def generate_batch_transactions(user_profile, count=10, anomaly_ratio=0.2):
     """
     Generate a batch of transactions for testing
     
     Args:
-        user_id: User identifier
+        user_profile: UserProfile object
         count: Number of transactions to generate
         anomaly_ratio: Proportion of anomalous transactions (0.0 to 1.0)
     
@@ -119,7 +114,7 @@ def generate_batch_transactions(user_id, count=10, anomaly_ratio=0.2):
     
     for i in range(count):
         is_anomaly = i < num_anomalies
-        txn = generate_transaction(user_id, is_anomaly)
+        txn = generate_transaction(user_profile, is_anomaly)
         transactions.append(txn)
     
     # Shuffle to mix normal and anomalous

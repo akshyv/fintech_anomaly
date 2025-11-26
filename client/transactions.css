@@ -1,34 +1,21 @@
-/* Navigation Bar */
 .nav-bar {
-    background: #667eea;
-    padding: 15px 40px;
-    margin: -40px -40px 30px -40px;
-    border-radius: 12px 12px 0 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
-}
-
-.nav-bar h1 {
-    color: white;
-    font-size: 1.8em;
-    margin: 0;
+    margin-bottom: 20px;
 }
 
 .nav-link {
-    color: white;
+    color: #667eea;
     text-decoration: none;
-    padding: 8px 16px;
-    background: rgba(255,255,255,0.2);
-    border-radius: 6px;
-    transition: all 0.3s;
+    font-weight: 600;
+    transition: color 0.3s;
 }
 
 .nav-link:hover {
-    background: rgba(255,255,255,0.3);
+    color: #5568d3;
 }
 
-/* Statistics Grid */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -38,9 +25,9 @@
 
 .stat-card {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 20px;
+    padding: 25px;
     border-radius: 8px;
+    color: white;
     text-align: center;
 }
 
@@ -51,35 +38,46 @@
 }
 
 .stat-label {
-    font-size: 0.9em;
+    font-size: 0.95em;
     opacity: 0.9;
 }
 
-/* Filters */
 .filters {
-    background: #f8f9fa;
-    padding: 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
     display: flex;
     gap: 15px;
-    align-items: center;
+    align-items: flex-end;
+    margin-bottom: 20px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
 }
 
 .filter-group {
     display: flex;
-    gap: 10px;
-    align-items: center;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.filter-group label {
+    font-weight: 600;
+    color: #555;
+    font-size: 0.9em;
 }
 
 .filter-select {
     padding: 8px 12px;
     border: 2px solid #ddd;
     border-radius: 6px;
-    font-size: 0.95em;
+    font-size: 1em;
+    background: white;
+    cursor: pointer;
 }
 
-/* Transactions Table */
+.filter-select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
 .transactions-table {
     background: white;
     border-radius: 8px;
@@ -92,42 +90,45 @@ table {
     border-collapse: collapse;
 }
 
-th {
+thead {
     background: #667eea;
     color: white;
-    padding: 12px;
+}
+
+thead th {
+    padding: 15px;
     text-align: left;
     font-weight: 600;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
-td {
-    padding: 12px;
+tbody tr {
     border-bottom: 1px solid #e9ecef;
+    transition: background 0.2s;
 }
 
-tr:hover {
+tbody tr:hover {
     background: #f8f9fa;
 }
 
-.amount-cell {
-    font-weight: bold;
-    font-size: 1.1em;
+tbody td {
+    padding: 12px 15px;
+    font-size: 0.95em;
 }
 
-/* Loading and Empty States */
-.loading {
+.loading, .empty-state {
     text-align: center;
-    padding: 40px;
+    padding: 40px 20px;
     color: #666;
 }
 
-.empty-state {
-    text-align: center;
-    padding: 60px;
-    color: #999;
+.empty-state-icon {
+    font-size: 3em;
+    margin-bottom: 10px;
 }
 
-.empty-state-icon {
-    font-size: 4em;
-    margin-bottom: 20px;
+.amount-cell {
+    font-family: 'Courier New', monospace;
 }

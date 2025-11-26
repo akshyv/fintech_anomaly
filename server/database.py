@@ -3,13 +3,10 @@ User profiles and database models
 """
 
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime
-from datetime import datetime
-# from database import Base
-
-
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from datetime import datetime
 import os
 
 # SQLite database file location
@@ -19,8 +16,8 @@ DATABASE_URL = f'sqlite:///{DB_PATH}'
 # Create engine
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False},  # Needed for SQLite
-    echo=False  # Set to True for SQL debug logging
+    connect_args={"check_same_thread": False},
+    echo=False
 )
 
 # Session factory
@@ -42,7 +39,7 @@ def get_db():
 def init_db():
     """Initialize database - create all tables"""
     Base.metadata.create_all(bind=engine)
-    print("✅ Database initialized successfully")
+    print("Database initialized successfully")
 
 
 class Transaction(Base):
@@ -99,7 +96,7 @@ class UserProfile:
         self.name = name
         self.account_age_days = account_age_days
         self.avg_transaction = avg_transaction
-        self.trust_score = trust_score  # 0.0 to 1.0
+        self.trust_score = trust_score
         self.preferred_categories = preferred_categories
     
     def to_dict(self):
@@ -118,7 +115,7 @@ USER_PROFILES = {
     "alice": UserProfile(
         user_id="alice",
         name="Alice Johnson",
-        account_age_days=730,  # 2 years old account
+        account_age_days=730,
         avg_transaction=150.0,
         trust_score=0.95,
         preferred_categories=["grocery", "gas", "restaurant"]
@@ -126,7 +123,7 @@ USER_PROFILES = {
     "bob": UserProfile(
         user_id="bob",
         name="Bob Smith",
-        account_age_days=365,  # 1 year old account
+        account_age_days=365,
         avg_transaction=300.0,
         trust_score=0.75,
         preferred_categories=["electronics", "online", "travel"]
@@ -134,7 +131,7 @@ USER_PROFILES = {
     "charlie": UserProfile(
         user_id="charlie",
         name="Charlie Williams",
-        account_age_days=30,  # New account (30 days)
+        account_age_days=30,
         avg_transaction=500.0,
         trust_score=0.40,
         preferred_categories=["luxury", "jewelry", "online"]
