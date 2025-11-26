@@ -1,0 +1,84 @@
+<!-- <!DOCTYPE html> -->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transaction History - Anomaly Detector</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="transactions.css">
+</head>
+<body>
+    <div class="container">
+        <div class="nav-bar">
+            <h1>📊 Transaction History</h1>
+            <a href="index.html" class="nav-link">← Back to Generator</a>
+        </div>
+        
+        <!-- Statistics Cards -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalStat">-</div>
+                <div class="stat-label">Total Transactions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="normalStat">-</div>
+                <div class="stat-label">Normal</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="anomalyStat">-</div>
+                <div class="stat-label">Anomalous</div>
+            </div>
+        </div>
+        
+        <!-- Filters -->
+        <div class="filters">
+            <div class="filter-group">
+                <label>User:</label>
+                <select id="userFilter" class="filter-select">
+                    <option value="">All Users</option>
+                    <option value="alice">Alice Johnson</option>
+                    <option value="bob">Bob Smith</option>
+                    <option value="charlie">Charlie Williams</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label>Type:</label>
+                <select id="typeFilter" class="filter-select">
+                    <option value="">All Types</option>
+                    <option value="false">Normal</option>
+                    <option value="true">Anomalous</option>
+                </select>
+            </div>
+            
+            <button id="refreshBtn" class="btn-primary">Refresh</button>
+        </div>
+        
+        <!-- Transactions Table -->
+        <div class="transactions-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Time</th>
+                        <th>User</th>
+                        <th>Amount</th>
+                        <th>Merchant</th>
+                        <th>Category</th>
+                        <th>Location</th>
+                        <th>Ratio</th>
+                        <th>Type</th>
+                    </tr>
+                </thead>
+                <tbody id="transactionsBody">
+                    <tr>
+                        <td colspan="9" class="loading">Loading transactions...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script src="transactions.js"></script>
+</body>
+</html>

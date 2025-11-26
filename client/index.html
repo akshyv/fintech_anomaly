@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transaction Anomaly Detector</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div>
+                <h1>🔍 Transaction Anomaly Detector</h1>
+                <p class="subtitle">Fintech Risk Scoring System</p>
+            </div>
+            <a href="transactions.html" style="color: #667eea; text-decoration: none; font-weight: 600;">
+                📊 View All Transactions →
+            </a>
+        </div>
+        
+        <!-- M0: Health Check -->
+        <div class="test-section">
+            <h2>System Health Check</h2>
+            <button id="healthBtn" class="btn-primary">Test Backend Connection</button>
+            <div id="healthResult" class="result-box"></div>
+        </div>
+
+        <!-- M1: Transaction Generator -->
+        <div class="generator-section">
+            <h2>🎲 Generate Transaction</h2>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="userSelect">Select Customer:</label>
+                    <select id="userSelect" class="input-select">
+                        <option value="">Loading users...</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Transaction Type:</label>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="txnType" value="normal" checked>
+                            <span>Normal</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="txnType" value="anomaly">
+                            <span>Anomalous</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <button id="generateBtn" class="btn-primary" disabled>Generate Transaction</button>
+            
+            <div id="transactionResult" class="result-box"></div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
