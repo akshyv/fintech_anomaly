@@ -1,8 +1,9 @@
 from flask import Blueprint, jsonify, request
 from datetime import datetime, timedelta
-from database import SessionLocal, get_user_profile, get_all_profiles, Transaction
+from database import SessionLocal, get_user_profile, get_all_profiles, Transaction, AuditLog
 from data_generator import generate_transaction
 from risk_ml import RiskMLService, generate_explanation
+from audit import log_decision, get_audit_logs
 import traceback
 
 api = Blueprint('api', __name__)
@@ -194,92 +195,215 @@ def score_transaction():
         return jsonify({'error': str(e)}), 500
 
 @api.route('/calculate-risk', methods=['POST'])
+@api.route('/calculate-risk', methods=['POST'])
 def calculate_risk():
-    db = SessionLocal()
+    """Calculate comprehensive risk score with business rules + ML"""
+    print("\n=== CALCULATE RISK START ===")
+    
     try:
-        print("=== CALCULATE RISK START ===")
-        data = request.get_json()
+        data = request.json
+        print(f"Received data: {data}")
+        
+        # Extract transaction and profile data
         transaction = data.get('transaction')
         user_profile = data.get('user_profile')
         ml_score = data.get('ml_score')
         
+        # Validation
         if not transaction or not user_profile or ml_score is None:
-            return jsonify({'error': 'transaction, user_profile, and ml_score are required'}), 400
+            print("❌ Missing required fields")
+            return jsonify({'error': 'Missing required fields: transaction, user_profile, or ml_score'}), 400
         
-        # Get recent transactions (last hour) for velocity calculation
-        user_id = transaction['user_id']
-        one_hour_ago = datetime.now() - timedelta(hours=1)
-        recent_transactions = db.query(Transaction).filter(
-            Transaction.user_id == user_id,
-            Transaction.timestamp >= one_hour_ago
-        ).all()
+        # Extract specific fields
+        transaction_id = transaction.get('transaction_id')
+        user_id = transaction.get('user_id')
+        amount = transaction.get('amount')
         
-        # Convert to list for velocity calculation
-        recent_txns_list = [{
-            'transaction_id': t.transaction_id,
-            'amount': float(t.amount),
-            'timestamp': t.timestamp.isoformat()
-        } for t in recent_transactions]
+        if not all([transaction_id, user_id, amount]):
+            print("❌ Missing transaction fields")
+            return jsonify({'error': 'Missing transaction_id, user_id, or amount'}), 400
         
-        result = risk_service.calculate_risk_score(
-            transaction, 
-            user_profile, 
-            ml_score, 
-            recent_txns_list
-        )
+        print(f"User profile: {user_profile['user_id']}, trust: {user_profile['trust_score']}")
+        print(f"Transaction ID: {transaction_id}, Amount: ${amount}, ML Score: {ml_score:.3f}")
         
-        print("=== CALCULATE RISK SUCCESS ===")
-        return jsonify(result)
+        # Get database session
+        db = SessionLocal()
+        
+        try:
+            # Calculate velocity (transactions in last hour)
+            # For demo, use simplified logic - in production, query DB for time window
+            recent_txns = db.query(Transaction).filter(Transaction.user_id == user_id).count()
+            velocity_score = min(recent_txns / 10.0, 1.0)  # Normalize: 10+ txns = max risk
+            
+            # Calculate amount ratio
+            avg_transaction = user_profile['avg_transaction']
+            amount_ratio = amount / avg_transaction
+            amount_ratio_score = min(amount_ratio / 3.0, 1.0)  # 3x avg = max risk
+            
+            # Calculate trust score (inverse of account age risk)
+            trust_score = user_profile['trust_score']
+            trust_risk = 1.0 - trust_score  # Higher trust = lower risk
+            
+            # === WEIGHTED RISK CALCULATION ===
+            risk_components = {
+                'ml_anomaly': {
+                    'value': ml_score,
+                    'weight': 0.4,
+                    'contribution': ml_score * 0.4
+                },
+                'amount_ratio': {
+                    'value': amount_ratio_score,
+                    'weight': 0.3,
+                    'contribution': amount_ratio_score * 0.3
+                },
+                'user_trust': {
+                    'value': trust_risk,
+                    'weight': 0.2,
+                    'contribution': trust_risk * 0.2
+                },
+                'velocity': {
+                    'value': velocity_score,
+                    'weight': 0.1,
+                    'contribution': velocity_score * 0.1
+                }
+            }
+            
+            # Calculate final weighted score
+            final_risk = sum(comp['contribution'] for comp in risk_components.values())
+            
+            # === DECISION LOGIC ===
+            if final_risk > 0.7:
+                decision = "DECLINE"
+            elif final_risk > 0.4:
+                decision = "MANUAL REVIEW"
+            else:
+                decision = "APPROVE"
+            
+            print(f"Final risk: {final_risk:.3f} → {decision}")
+            
+            # === LOG TO AUDIT TRAIL ===
+            print("=== CALLING AUDIT LOGGER ===")
+            audit_entry = log_decision(
+                transaction_id=transaction_id,
+                user_id=user_id,
+                risk_score=final_risk,
+                decision=decision,
+                risk_components=risk_components,
+                explanation=None  # Will be added by /explain-decision endpoint
+            )
+            
+            response = {
+                'risk_score': round(final_risk, 3),
+                'decision': decision,
+                'components': risk_components,
+                'audit_id': audit_entry.id  # Return audit log ID for reference
+            }
+            
+            print("=== CALCULATE RISK SUCCESS ===")
+            return jsonify(response)
+            
+        finally:
+            db.close()
+        
     except Exception as e:
-        print("=== CALCULATE RISK ERROR ===")
-        print(f"Error: {str(e)}")
+        print(f"❌ ERROR: {str(e)}")
+        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
-    finally:
-        db.close()
-        
-@api.route('/explain-decision', methods=['POST'])
-def explain_decision():
-    """
-    Generate LLM explanation for risk decision.
     
-    Expected JSON body:
-    {
-        "transaction": {...},
-        "risk_components": {...},
-        "decision": "APPROVE" | "MANUAL REVIEW" | "DECLINE"
-    }
+@api.route('/audit-log', methods=['GET'])
+def get_audit_log():
     """
+    Retrieve audit log entries for compliance review.
+    Query params:
+        - limit: Max entries to return (default 10, max 100)
+        - user_id: Filter by specific user (optional)
+    """
+    print("\n=== GET AUDIT LOG START ===")
+    
     try:
-        print("=== EXPLAIN DECISION START ===")
-        data = request.json
+        # Parse query parameters
+        limit = request.args.get('limit', default=10, type=int)
+        user_id = request.args.get('user_id', default=None, type=str)
         
-        # Validate required fields
-        required = ['transaction', 'risk_components', 'decision']
-        for field in required:
-            if field not in data:
-                print(f"❌ Missing field: {field}")
-                return jsonify({'error': f'Missing required field: {field}'}), 400
+        # Enforce max limit
+        limit = min(limit, 100)
         
-        transaction = data['transaction']
-        risk_components = data['risk_components']
-        decision = data['decision']
+        print(f"Fetching audit logs: limit={limit}, user_id={user_id}")
         
-        print(f"Generating explanation for {decision} decision (risk: {risk_components.get('final_score', 0):.2f})")
+        # Fetch logs using audit service
+        logs = get_audit_logs(limit=limit, user_id=user_id)
         
-        # Call LLM service
-        explanation = generate_explanation(transaction, risk_components, decision)
-        
-        print(f"✅ Explanation generated: {explanation[:50]}...")
-        print("=== EXPLAIN DECISION SUCCESS ===")
+        print(f"✅ Returning {len(logs)} audit entries")
+        print("=== GET AUDIT LOG SUCCESS ===")
         
         return jsonify({
-            'explanation': explanation,
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
+            'count': len(logs),
+            'logs': logs
         })
         
     except Exception as e:
-        print("=== EXPLAIN DECISION ERROR ===")
-        print(f"Error: {str(e)}")
+        print(f"❌ ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+        
+@api.route('/explain-decision', methods=['POST'])
+def explain_decision():
+    """Generate LLM explanation for risk decision"""
+    print("\n=== EXPLAIN DECISION START ===")
+    
+    try:
+        data = request.json
+        transaction = data.get('transaction')
+        risk_components = data.get('risk_components')
+        decision = data.get('decision')
+        
+        if not all([transaction, risk_components, decision]):
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        # Import the standalone function (not from class)
+        from risk_ml import generate_explanation
+        
+        # Call the standalone function directly
+        explanation = generate_explanation(
+            transaction=transaction,
+            risk_components=risk_components,
+            decision=decision
+        )
+        
+        print(f"✅ Generated explanation: {explanation[:100]}...")
+        
+        # === UPDATE AUDIT LOG WITH EXPLANATION ===
+        transaction_id = transaction.get('transaction_id')
+        if transaction_id:
+            print(f"=== UPDATING AUDIT LOG {transaction_id} WITH EXPLANATION ===")
+            db = SessionLocal()
+            try:
+                # Find the most recent audit entry for this transaction
+                audit_entry = db.query(AuditLog).filter(
+                    AuditLog.transaction_id == transaction_id
+                ).order_by(AuditLog.timestamp.desc()).first()
+                
+                if audit_entry:
+                    audit_entry.explanation = explanation
+                    db.commit()
+                    print(f"✅ Audit log {audit_entry.id} updated with explanation")
+                else:
+                    print(f"⚠️ No audit entry found for transaction {transaction_id}")
+            finally:
+                db.close()
+        
+        response = {
+            'explanation': explanation,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        print("=== EXPLAIN DECISION SUCCESS ===")
+        return jsonify(response)
+        
+    except Exception as e:
+        print(f"❌ ERROR: {str(e)}")
+        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500

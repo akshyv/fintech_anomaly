@@ -93,6 +93,18 @@
                 <div id="llmContent" class="llm-explanation"></div>
             </div>
         </div>
+        <div id="auditSection" class="audit-section">
+            <h3>📋 Compliance Audit Trail</h3>
+            <p style="font-size: 14px; color: #718096; margin-bottom: 15px;">
+                All risk decisions are logged for regulatory compliance
+            </p>
+            <button onclick="loadAuditLog()" class="btn-primary" style="margin-bottom: 15px;">
+                🔄 Refresh Audit Log
+            </button>
+            <div id="auditLogContainer">
+                <!-- Audit entries will be populated here by JavaScript -->
+            </div>
+        </div>
     </div>
     
     <script src="script.js"></script>

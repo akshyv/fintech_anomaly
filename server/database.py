@@ -67,8 +67,50 @@ class Transaction(Base):
             "timestamp": self.timestamp.isoformat() + 'Z' if self.timestamp else None,
             "is_anomaly": self.is_anomaly
         }
-
-
+class AuditLog(Base):
+    """
+    Audit log for compliance tracking.
+    Records every risk decision with full context.
+    """
+    __tablename__ = 'audit_log'
+    
+    # Primary key - auto-incrementing ID
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    
+    # Transaction reference
+    transaction_id = Column(Integer, nullable=False)
+    user_id = Column(String(50), nullable=False)
+    
+    # Risk assessment results
+    risk_score = Column(Float, nullable=False)  # 0.0 - 1.0
+    decision = Column(String(20), nullable=False)  # APPROVE/MANUAL REVIEW/DECLINE
+    
+    # Risk components breakdown (stored as JSON string)
+    risk_components = Column(String, nullable=True)  # JSON: {ml_score, amount_ratio, etc.}
+    
+    # AI explanation
+    explanation = Column(String, nullable=True)
+    
+    # Audit metadata
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    def __repr__(self):
+        return f"<AuditLog {self.id}: {self.decision} for txn {self.transaction_id}>"
+    
+    def to_dict(self):
+        """Convert audit log entry to dictionary for JSON response"""
+        import json
+        return {
+            'id': self.id,
+            'transaction_id': self.transaction_id,
+            'user_id': self.user_id,
+            'risk_score': round(self.risk_score, 3),
+            'decision': self.decision,
+            'risk_components': json.loads(self.risk_components) if self.risk_components else {},
+            'explanation': self.explanation,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None
+        }
+    
 class UserProfile:
     """Represents a customer profile with transaction patterns"""
     
