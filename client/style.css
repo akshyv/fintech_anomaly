@@ -330,3 +330,32 @@ pre {
         flex-direction: column;
     }
 }
+
+/* ADD THIS AT THE END OF THE FILE: */
+
+/* LLM Explanation Styling */
+.llm-explanation {
+    margin-top: 25px;
+    animation: fadeIn 0.3s ease-in;
+}
+
+/* Loading Spinner */
+.spinner {
+    border: 3px solid #f3f4f6;
+    border-top: 3px solid #667eea;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}

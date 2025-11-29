@@ -1,5 +1,8 @@
 import pickle
 import numpy as np
+from groq import Groq
+from config import Config
+import json
 import shap
 from datetime import datetime, timedelta
 
@@ -155,3 +158,106 @@ class RiskMLService:
             }
         except Exception as e:
             raise Exception(f"Error calculating risk score: {str(e)}")
+        
+# FIND the generate_explanation function (around line 160-245)
+# REPLACE THE ENTIRE FUNCTION WITH THIS CORRECTED VERSION:
+
+def generate_explanation(transaction: dict, risk_components: dict, decision: str) -> str:
+    """
+    Generate human-readable explanation using Groq LLM.
+    
+    Why Groq + llama-3.3-70b-versatile?
+    - 500+ tokens/sec (10x faster than GPT-4)
+    - Free tier: 14,400 requests/day
+    - Excellent at concise financial reasoning
+    - Low latency critical for real-time risk decisions
+    
+    Args:
+        transaction: Full transaction dict
+        risk_components: Dict with model_anomaly, amount_ratio, user_trust, velocity (each containing value/weight/contribution)
+        decision: "APPROVE" | "MANUAL REVIEW" | "DECLINE"
+    
+    Returns:
+        <100 token plain English explanation
+    """
+    try:
+        print(f"=== GROQ LLM EXPLANATION START ===")
+        print(f"Decision: {decision}")
+        print(f"Risk components structure: {risk_components.keys()}")
+        
+        # Extract values from nested structure
+        model_anomaly = risk_components.get('model_anomaly', {}).get('value', 0)
+        amount_ratio_raw = risk_components.get('amount_ratio', {}).get('raw_ratio', 1)
+        user_trust = risk_components.get('user_trust', {}).get('value', 0)
+        velocity = risk_components.get('velocity', {}).get('value', 0)
+        account_age = risk_components.get('user_trust', {}).get('account_age_days', 0)
+        
+        print(f"Extracted values - ML: {model_anomaly:.2f}, Amount Ratio: {amount_ratio_raw:.2f}x")
+        
+        # Check if API key exists
+        if not Config.GROQ_API_KEY:
+            print("❌ GROQ_API_KEY not configured")
+            raise ValueError("Groq API key not found in environment")
+        
+        # Initialize Groq client
+        client = Groq(api_key=Config.GROQ_API_KEY)
+        
+        # Build context-rich prompt
+        prompt = f"""You are a financial risk analyst. Explain this transaction decision in <100 tokens.
+
+TRANSACTION:
+- Amount: ${transaction['amount']:.2f}
+- Merchant: {transaction['merchant']} ({transaction['merchant_category']})
+- User: {transaction.get('user_id', 'Unknown')} (account age: {account_age} days)
+- Time: {transaction['timestamp']}
+
+RISK ANALYSIS:
+- ML Anomaly Score: {model_anomaly:.2f}/1.0 (weight: 40%)
+- Amount Ratio: {amount_ratio_raw:.2f}x avg (weight: 30%)
+- User Trust Score: {user_trust:.2f}/1.0 (weight: 20%)
+- Velocity Score: {velocity:.2f}/1.0 (weight: 10%)
+
+DECISION: {decision}
+
+Explain why this decision was made. Focus on the top 2 risk factors. Be concise and actionable."""
+
+        # Call Groq API
+        print(f"Calling Groq API with model: llama-3.3-70b-versatile")
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",  # Best speed/quality balance
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a concise financial risk analyst. Respond in <100 tokens."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            max_tokens=150,  # Hard limit to prevent verbose responses
+            temperature=0.3,  # Low temp = more deterministic/factual
+            timeout=10  # Fail fast if Groq is slow
+        )
+        
+        explanation = response.choices[0].message.content.strip()
+        token_count = len(explanation.split())
+        
+        print(f"✅ LLM explanation generated ({token_count} tokens)")
+        print(f"Explanation preview: {explanation[:100]}...")
+        print(f"=== GROQ LLM EXPLANATION SUCCESS ===")
+        
+        return explanation
+        
+    except Exception as e:
+        print(f"❌ GROQ LLM ERROR: {str(e)}")
+        print(f"=== GROQ LLM EXPLANATION FAILED ===")
+        
+        # Fallback explanation if LLM fails - FIXED to handle nested dict
+        try:
+            model_score = risk_components.get('model_anomaly', {}).get('value', 0)
+            amount_ratio = risk_components.get('amount_ratio', {}).get('raw_ratio', 1)
+            return f"Decision: {decision}. Primary risk factors: ML anomaly score ({model_score:.2f}) and amount ratio ({amount_ratio:.2f}x average)."
+        except:
+            # Ultimate fallback if even that fails
+            return f"Decision: {decision}. Unable to generate detailed explanation due to technical error."

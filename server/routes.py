@@ -2,11 +2,12 @@ from flask import Blueprint, jsonify, request
 from datetime import datetime, timedelta
 from database import SessionLocal, get_user_profile, get_all_profiles, Transaction
 from data_generator import generate_transaction
-from risk_ml import RiskMLService
+from risk_ml import RiskMLService, generate_explanation
 import traceback
 
 api = Blueprint('api', __name__)
 risk_service = RiskMLService()
+USER_PROFILES = get_all_profiles()
 
 @api.route('/health', methods=['GET'])
 def health():
@@ -119,15 +120,18 @@ def get_transactions():
         print(f"Found {len(transactions)} transactions")
         
         result = [{
-            'transaction_id': t.transaction_id,
-            'user_id': t.user_id,
-            'amount': float(t.amount),
-            'merchant': t.merchant,
-            'merchant_category': t.merchant_category,
-            'location': t.location,
-            'timestamp': t.timestamp.isoformat() + 'Z',
-            'is_anomaly': t.is_anomaly
-        } for t in transactions]
+        'transaction_id': str(t.transaction_id),  # Convert to string
+        'user_id': t.user_id,
+        'user_name': next((u['name'] for u in USER_PROFILES if u['user_id'] == t.user_id), 'Unknown'),  # Add user name
+        'amount': float(t.amount),
+        'merchant': t.merchant,
+        'merchant_category': t.merchant_category,
+        'location': t.location,
+        'timestamp': t.timestamp.isoformat() + 'Z',
+        'is_anomaly': t.is_anomaly,
+        'is_anomaly_label': t.is_anomaly,  # For frontend badge
+        'amount_ratio': float(t.amount) / next((u['avg_transaction'] for u in USER_PROFILES if u['user_id'] == t.user_id), 100)  # Calculate ratio
+    } for t in transactions]
         
         print("=== GET TRANSACTIONS SUCCESS ===")
         return jsonify({
@@ -233,3 +237,49 @@ def calculate_risk():
         return jsonify({'error': str(e)}), 500
     finally:
         db.close()
+        
+@api.route('/explain-decision', methods=['POST'])
+def explain_decision():
+    """
+    Generate LLM explanation for risk decision.
+    
+    Expected JSON body:
+    {
+        "transaction": {...},
+        "risk_components": {...},
+        "decision": "APPROVE" | "MANUAL REVIEW" | "DECLINE"
+    }
+    """
+    try:
+        print("=== EXPLAIN DECISION START ===")
+        data = request.json
+        
+        # Validate required fields
+        required = ['transaction', 'risk_components', 'decision']
+        for field in required:
+            if field not in data:
+                print(f"❌ Missing field: {field}")
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+        
+        transaction = data['transaction']
+        risk_components = data['risk_components']
+        decision = data['decision']
+        
+        print(f"Generating explanation for {decision} decision (risk: {risk_components.get('final_score', 0):.2f})")
+        
+        # Call LLM service
+        explanation = generate_explanation(transaction, risk_components, decision)
+        
+        print(f"✅ Explanation generated: {explanation[:50]}...")
+        print("=== EXPLAIN DECISION SUCCESS ===")
+        
+        return jsonify({
+            'explanation': explanation,
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+        
+    except Exception as e:
+        print("=== EXPLAIN DECISION ERROR ===")
+        print(f"Error: {str(e)}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500

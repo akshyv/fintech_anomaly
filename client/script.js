@@ -135,6 +135,10 @@ async function calculateRisk() {
         const riskResult = await response.json();
         
         displayRiskScore(riskResult);
+        
+        // Generate LLM explanation after risk calculation
+        await generateExplanation(currentTransaction, riskResult);
+        
     } catch (error) {
         console.error('Error calculating risk:', error);
         showError('Failed to calculate risk score');
@@ -231,6 +235,87 @@ function getComponentColor(contribution) {
     if (contribution > 0.25) return '#dc3545'; // High contribution - red
     if (contribution > 0.15) return '#ffc107'; // Medium contribution - yellow
     return '#17a2b8'; // Low contribution - blue
+}
+
+async function generateExplanation(transaction, riskData) {
+    const llmLoading = document.getElementById('llmLoading');
+    const llmContent = document.getElementById('llmContent');
+    
+    // Show loading state
+    llmLoading.style.display = 'block';
+    llmContent.innerHTML = '';
+    
+    try {
+        console.log('🤖 Requesting LLM explanation from Groq...');
+        
+        const response = await fetch(`${API_URL}/explain-decision`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                transaction: transaction,
+                risk_components: riskData.components,
+                decision: riskData.decision
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        // Hide loading, show explanation
+        llmLoading.style.display = 'none';
+        llmContent.innerHTML = `
+            <div style="
+                background: #f7fafc;
+                border-left: 4px solid #667eea;
+                padding: 15px;
+                border-radius: 4px;
+                line-height: 1.6;
+                color: #2d3748;
+                margin-top: 10px;
+            ">
+                <p style="margin: 0; white-space: pre-wrap;">${data.explanation}</p>
+                <div style="
+                    margin-top: 10px;
+                    padding-top: 10px;
+                    border-top: 1px solid #e2e8f0;
+                    font-size: 0.85em;
+                    color: #718096;
+                ">
+                    <strong>Model:</strong> Llama 3.3 70B (via Groq) • 
+                    <strong>Generated:</strong> ${new Date(data.timestamp).toLocaleTimeString()}
+                </div>
+            </div>
+        `;
+        
+        console.log('✅ LLM explanation received');
+        
+    } catch (error) {
+        console.error('❌ Error generating explanation:', error);
+        llmLoading.style.display = 'none';
+        llmContent.innerHTML = `
+            <div style="
+                background: #fff5f5;
+                border-left: 4px solid #e53e3e;
+                padding: 15px;
+                border-radius: 4px;
+                margin-top: 10px;
+            ">
+                <p style="color: #e53e3e; margin: 0; font-weight: 600;">
+                    ⚠️ Could not generate explanation
+                </p>
+                <p style="margin: 10px 0 0 0; font-size: 0.9em; color: #718096;">
+                    Error: ${error.message}
+                </p>
+                <p style="margin: 10px 0 0 0; font-size: 0.9em; color: #718096;">
+                    The risk analysis is still valid. This is just the AI explanation that failed.
+                </p>
+            </div>
+        `;
+    }
 }
 
 function showError(message) {
