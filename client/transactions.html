@@ -1,17 +1,20 @@
-<!-- \client\transactions.html -->
-<!-- <!DOCTYPE html> -->
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Transaction History - Anomaly Detector</title>
+    <title>Transaction & Audit Logs - Anomaly Detector</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="transactions.css">
 </head>
 <body>
     <div class="container">
+        <!-- Header with Navigation -->
         <div class="nav-bar">
-            <h1>📊 Transaction History</h1>
+            <div>
+                <h1>📊 Transaction & Audit Logs</h1>
+                <p class="subtitle">Monitor all transactions and compliance audit trail</p>
+            </div>
             <a href="index.html" class="nav-link">← Back to Generator</a>
         </div>
         
@@ -31,7 +34,17 @@
             </div>
         </div>
         
-        <!-- Filters -->
+        <!-- Tab Navigation -->
+        <div class="tab-navigation">
+            <button class="tab-button active" data-tab="transactions">
+                📋 Transactions
+            </button>
+            <button class="tab-button" data-tab="audit">
+                🔒 Audit Log
+            </button>
+        </div>
+        
+        <!-- Filters Section - ALL REQUIRED ELEMENTS -->
         <div class="filters">
             <div class="filter-group">
                 <label>User:</label>
@@ -43,7 +56,7 @@
                 </select>
             </div>
             
-            <div class="filter-group">
+            <div class="filter-group" id="typeFilterGroup">
                 <label>Type:</label>
                 <select id="typeFilter" class="filter-select">
                     <option value="">All Types</option>
@@ -52,32 +65,98 @@
                 </select>
             </div>
             
-            <button id="refreshBtn" class="btn-primary">Refresh</button>
+            <div class="filter-group" id="decisionFilterGroup" style="display: none;">
+                <label>Decision:</label>
+                <select id="decisionFilter" class="filter-select">
+                    <option value="">All Decisions</option>
+                    <option value="APPROVE">Approve</option>
+                    <option value="MANUAL REVIEW">Manual Review</option>
+                    <option value="DECLINE">Decline</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label>Date Range:</label>
+                <select id="dateRangeFilter" class="filter-select">
+                    <option value="all">All Time</option>
+                    <option value="today">Today</option>
+                    <option value="week">Last 7 Days</option>
+                    <option value="month">Last 30 Days</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label>Search ID:</label>
+                <input type="text" id="searchFilter" class="filter-input" placeholder="Search by ID...">
+            </div>
+            
+            <button id="refreshBtn" class="btn-primary">🔄 Refresh</button>
+            <button id="exportBtn" class="btn-secondary">📥 Export CSV</button>
         </div>
         
-        <!-- Transactions Table -->
-        <div class="transactions-table">
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Time</th>
-                        <th>User</th>
-                        <th>Amount</th>
-                        <th>Merchant</th>
-                        <th>Category</th>
-                        <th>Location</th>
-                        <th>Ratio</th>
-                        <th>Type</th>
-                    </tr>
-                </thead>
-                <tbody id="transactionsBody">
-                    <tr>
-                        <td colspan="9" class="loading">Loading transactions...</td>
-                    </tr>
-                </tbody>
-            </table>
+        <!-- Transactions Tab Content -->
+        <div id="transactionsTab" class="tab-content active">
+            <div class="transactions-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Transaction ID</th>
+                            <th>Timestamp</th>
+                            <th>User</th>
+                            <th>Amount</th>
+                            <th>Merchant</th>
+                            <th>Category</th>
+                            <th>Location</th>
+                            <th>Ratio</th>
+                            <th>Type</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionsBody">
+                        <tr>
+                            <td colspan="9" class="loading">
+                                <div class="spinner"></div>
+                                <p>Loading transactions...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="table-footer">
+                <span id="transactionsCount">0 transactions</span>
+            </div>
         </div>
+        
+        <!-- Audit Log Tab Content -->
+        <div id="auditTab" class="tab-content">
+            <div class="transactions-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Audit ID</th>
+                            <th>Timestamp</th>
+                            <th>User</th>
+                            <th>Transaction ID</th>
+                            <th>Risk Score</th>
+                            <th>Decision</th>
+                            <th>Risk Components</th>
+                            <th>AI Explanation</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditBody">
+                        <tr>
+                            <td colspan="8" class="loading">
+                                <div class="spinner"></div>
+                                <p>Loading audit log...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="table-footer">
+                <span id="auditCount">0 audit entries</span>
+            </div>
+        </div>
+        
     </div>
     
     <script src="transactions.js"></script>

@@ -8,11 +8,14 @@
 </head>
 <body>
     <div class="container">
-        <h1>Transaction Anomaly Detector</h1>
+        <div class="header-section">
+            <h1>🔍 Transaction Anomaly Detector</h1>
+            <p class="subtitle">AI-powered fraud detection with explainable risk scoring</p>
+        </div>
         
         <div class="nav-links">
             <a href="index.html" class="active">Generator</a>
-            <a href="transactions.html">Transaction History</a>
+            <a href="transactions.html">Transaction & Audit Logs</a>
         </div>
         
         <div class="generator-section">
@@ -92,17 +95,15 @@
                 </div>
                 <div id="llmContent" class="llm-explanation"></div>
             </div>
-        </div>
-        <div id="auditSection" class="audit-section">
-            <h3>📋 Compliance Audit Trail</h3>
-            <p style="font-size: 14px; color: #718096; margin-bottom: 15px;">
-                All risk decisions are logged for regulatory compliance
-            </p>
-            <button onclick="loadAuditLog()" class="btn-primary" style="margin-bottom: 15px;">
-                🔄 Refresh Audit Log
-            </button>
-            <div id="auditLogContainer">
-                <!-- Audit entries will be populated here by JavaScript -->
+            
+            <!-- Link to Full Audit Trail -->
+            <div style="margin-top: 30px; padding: 20px; background: #f7fafc; border-radius: 8px; border: 2px solid #e2e8f0; text-align: center;">
+                <p style="color: #4a5568; margin-bottom: 10px;">
+                    📋 This decision has been logged for compliance
+                </p>
+                <a href="transactions.html#audit" class="btn-secondary" style="display: inline-block; text-decoration: none;">
+                    View Full Audit Trail →
+                </a>
             </div>
         </div>
     </div>
